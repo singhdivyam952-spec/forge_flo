@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: erp-mongodb
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: manufacturing_erp
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: erp-backend
+    restart: unless-stopped
+    ports:
+      - '5000:5000'
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: mongodb://mongodb:27017/manufacturing_erp
+      CLIENT_URL: http://localhost:5173
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-prod-access-secret-change-in-production-32}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-prod-refresh-secret-change-in-production-32}
+      STORAGE_TYPE: local
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - upload_data:/app/uploads
+    depends_on:
+      - mongodb
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: erp-frontend
+    restart: unless-stopped
+    ports:
+      - '5173:80'
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
+  upload_data:
