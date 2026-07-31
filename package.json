@@ -21,6 +21,9 @@
   "devDependencies": {
     "concurrently": "^9.1.2"
   },
+  "overrides": {
+    "vite": "^6.4.3"
+  },
   "engines": {
     "node": ">=20"
   }

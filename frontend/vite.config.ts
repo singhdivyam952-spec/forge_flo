@@ -1,8 +1,9 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type PluginOption } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  plugins: [react()],
+  // Cast avoids monorepo dual-Vite type clash (root vitest Vite 5 vs frontend Vite 6)
+  plugins: [react() as PluginOption],
   server: {
     port: 5173,
     open: false,
