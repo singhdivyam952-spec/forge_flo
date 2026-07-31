@@ -69,6 +69,10 @@ function loadEnv(): Env {
       .join('\n');
     // eslint-disable-next-line no-console
     console.error(`\n❌ Invalid environment variables:\n${formatted}\n`);
+    // On Vercel, process.exit kills the whole serverless runtime with an opaque 500.
+    if (process.env.VERCEL) {
+      throw new Error(`Invalid environment variables:\n${formatted}`);
+    }
     process.exit(1);
   }
 

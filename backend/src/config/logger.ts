@@ -3,9 +3,17 @@ import path from 'path';
 import winston from 'winston';
 import { env, isProduction } from './env';
 
-const logsDir = path.resolve(process.cwd(), 'logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
+const isServerless = Boolean(process.env.VERCEL) || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+const logsDir = isServerless ? path.join('/tmp', 'logs') : path.resolve(process.cwd(), 'logs');
+
+let canWriteFiles = false;
+try {
+  if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true });
+  }
+  canWriteFiles = true;
+} catch {
+  canWriteFiles = false;
 }
 
 const { combine, timestamp, printf, colorize, errors, splat, json } = winston.format;
@@ -23,11 +31,14 @@ const consoleFormat = combine(
 
 const fileFormat = combine(timestamp(), errors({ stack: true }), splat(), json());
 
-export const logger = winston.createLogger({
-  level: env.LOG_LEVEL,
-  format: fileFormat,
-  defaultMeta: { service: 'manufacturing-erp-backend' },
-  transports: [
+const transports: winston.transport[] = [
+  new winston.transports.Console({
+    format: isProduction ? combine(timestamp(), json()) : consoleFormat,
+  }),
+];
+
+if (canWriteFiles) {
+  transports.push(
     new winston.transports.File({
       filename: path.join(logsDir, 'error.log'),
       level: 'error',
@@ -38,24 +49,17 @@ export const logger = winston.createLogger({
       filename: path.join(logsDir, 'combined.log'),
       maxsize: 5 * 1024 * 1024,
       maxFiles: 5,
-    }),
-  ],
-  exitOnError: false,
-});
-
-if (!isProduction) {
-  logger.add(
-    new winston.transports.Console({
-      format: consoleFormat,
-    })
-  );
-} else {
-  logger.add(
-    new winston.transports.Console({
-      format: combine(timestamp(), json()),
     })
   );
 }
+
+export const logger = winston.createLogger({
+  level: env.LOG_LEVEL,
+  format: fileFormat,
+  defaultMeta: { service: 'manufacturing-erp-backend' },
+  transports,
+  exitOnError: false,
+});
 
 export const httpLogStream = {
   write: (message: string) => logger.http(message.trim()),

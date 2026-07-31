@@ -14,40 +14,44 @@ if (env.MONGODB_URI.startsWith('mongodb+srv://')) {
   }
 }
 
+const isServerless = Boolean(process.env.VERCEL) || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+
 const options: mongoose.ConnectOptions = {
   autoIndex: !isTest,
-  maxPoolSize: 20,
-  minPoolSize: 2,
+  maxPoolSize: isServerless ? 5 : 20,
+  minPoolSize: isServerless ? 0 : 2,
   serverSelectionTimeoutMS: 10000,
   socketTimeoutMS: 45000,
   family: 4,
+  bufferCommands: false,
 };
 
-let isConnected = false;
+let listenersAttached = false;
 
 export async function connectDatabase(uri: string = env.MONGODB_URI): Promise<typeof mongoose> {
-  if (isConnected) {
+  if (mongoose.connection.readyState === 1) {
     return mongoose;
   }
 
-  mongoose.connection.on('connected', () => {
-    isConnected = true;
-    logger.info(`MongoDB connected: ${maskUri(uri)}`);
-  });
+  if (!listenersAttached) {
+    listenersAttached = true;
+    mongoose.connection.on('connected', () => {
+      logger.info(`MongoDB connected: ${maskUri(uri)}`);
+    });
+    mongoose.connection.on('error', (err) => {
+      logger.error('MongoDB connection error', { error: err.message });
+    });
+    mongoose.connection.on('disconnected', () => {
+      logger.warn('MongoDB disconnected');
+    });
 
-  mongoose.connection.on('error', (err) => {
-    logger.error('MongoDB connection error', { error: err.message });
-  });
-
-  mongoose.connection.on('disconnected', () => {
-    isConnected = false;
-    logger.warn('MongoDB disconnected');
-  });
-
-  process.on('SIGINT', async () => {
-    await disconnectDatabase();
-    process.exit(0);
-  });
+    if (!isServerless) {
+      process.on('SIGINT', async () => {
+        await disconnectDatabase();
+        process.exit(0);
+      });
+    }
+  }
 
   try {
     await mongoose.connect(uri, options);
@@ -61,7 +65,6 @@ export async function connectDatabase(uri: string = env.MONGODB_URI): Promise<ty
 export async function disconnectDatabase(): Promise<void> {
   if (mongoose.connection.readyState !== 0) {
     await mongoose.connection.close();
-    isConnected = false;
     logger.info('MongoDB connection closed');
   }
 }
