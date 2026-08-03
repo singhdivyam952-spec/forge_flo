@@ -90,9 +90,23 @@ export async function searchExistingParts(params: Record<string, unknown>): Prom
   return response.data.data;
 }
 
+export async function fetchEnquiryByCustomerId(customerId: string): Promise<Record<string, unknown>> {
+  const response = await apiClient.get<ApiResponse<Record<string, unknown>>>(
+    `/marketing/enquiries/by-customer-id/${encodeURIComponent(customerId.trim())}`
+  );
+  return response.data.data;
+}
+
 export const marketingApi = {
   convertEnquiryToRfq: async (id: string) =>
     (await apiClient.post<ApiResponse<Record<string, unknown>>>(`/marketing/enquiries/${id}/convert-to-rfq`)).data.data,
+  setExistingPartDecision: async (id: string, payload: { existingPartMatched: boolean; existingPartReference?: string }) =>
+    (await apiClient.post<ApiResponse<Record<string, unknown>>>(`/marketing/enquiries/${id}/existing-part-decision`, payload)).data.data,
+  createNpdFromEnquiry: async (id: string) =>
+    (await apiClient.post<ApiResponse<Record<string, unknown>>>(`/marketing/enquiries/${id}/create-npd`)).data.data,
+  advanceEnquiryWorkflow: async (id: string, stage: string, remarks?: string) =>
+    (await apiClient.post<ApiResponse<Record<string, unknown>>>(`/marketing/enquiries/${id}/advance-workflow`, { stage, remarks })).data
+      .data,
   convertQuotationToSalesOrder: async (id: string) =>
     (await apiClient.post<ApiResponse<Record<string, unknown>>>(`/marketing/quotations/${id}/convert-to-sales-order`)).data.data,
   emailQuotation: async (id: string, recipients: string[]) =>

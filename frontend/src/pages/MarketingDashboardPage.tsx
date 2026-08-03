@@ -78,13 +78,15 @@ export function MarketingDashboardPage() {
     <>
       <PageHeader
         title="Marketing Dashboard"
-        subtitle="Customer pipeline, quotation funnel, and order conversion overview"
+        subtitle="Flow: Enquiry → Docs → Process → Existing Part / NPD → Feasibility → Cost → Quotation → Purchase Order → PPC → PDI → Packing"
         actions={
-          <Stack direction="row" spacing={1}>
-            <Button variant="outlined" onClick={() => navigate('/sales/customers')}>New Customer</Button>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Button variant="contained" onClick={() => navigate('/sales/enquiries')}>New Enquiry</Button>
-            <Button variant="outlined" onClick={() => navigate('/sales/rfqs')}>Create RFQ</Button>
-            <Button variant="outlined" onClick={() => navigate('/sales/quotations')}>Create Quotation</Button>
+            <Button variant="outlined" onClick={() => navigate('/sales/marketing-npds')}>NPD</Button>
+            <Button variant="outlined" onClick={() => navigate('/sales/sales-orders')}>Purchase Order</Button>
+            <Button variant="outlined" onClick={() => navigate('/sales/marketing-ppc')}>PPC</Button>
+            <Button variant="outlined" onClick={() => navigate('/sales/marketing-qa')}>PDI / QA</Button>
+            <Button variant="outlined" onClick={() => navigate('/sales/marketing-packing-dispatch')}>Packing</Button>
           </Stack>
         }
       />
@@ -96,7 +98,7 @@ export function MarketingDashboardPage() {
         <Grid size={{ xs: 12, sm: 6, md: 3 }}><KpiCard label="Pending RFQs" value={num(cards.pendingRfqs)} icon={RequestQuoteOutlinedIcon} tone="info" /></Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}><KpiCard label="Pending Quotations" value={num(cards.pendingQuotations)} icon={ReceiptLongOutlinedIcon} tone="warning" /></Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}><KpiCard label="Approved Quotations" value={num(cards.approvedQuotations)} icon={ReceiptLongOutlinedIcon} tone="success" /></Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}><KpiCard label="Sales Orders Created" value={num(cards.salesOrdersCreated)} icon={ShoppingCartOutlinedIcon} tone="primary" /></Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}><KpiCard label="Purchase Orders Created" value={num(cards.salesOrdersCreated)} icon={ShoppingCartOutlinedIcon} tone="primary" /></Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}><KpiCard label="Monthly Conversion Rate" value={num(cards.monthlyConversionRate)} suffix="%" icon={TrendingUpOutlinedIcon} tone="success" /></Grid>
       </Grid>
 
@@ -137,7 +139,7 @@ export function MarketingDashboardPage() {
         </Grid>
         <Grid size={{ xs: 12, lg: 4 }}>
           <Paper variant="outlined">
-            <CardHeader title={<Typography variant="subtitle1" fontWeight={700}>Sales Order Trend</Typography>} />
+            <CardHeader title={<Typography variant="subtitle1" fontWeight={700}>Purchase Order Trend</Typography>} />
             <Box sx={{ height: 300, p: 1 }}>
               <ResponsiveContainer>
                 <LineChart data={salesOrderTrend}>

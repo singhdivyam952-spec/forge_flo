@@ -32,6 +32,10 @@ export function getModuleReadPermission(moduleKey?: string): string | undefined 
     'cost-estimations': 'sales:read',
     quotations: 'sales:read',
     'sales-orders': 'sales:read',
+    'marketing-npds': 'sales:read',
+    'marketing-ppc': 'sales:read',
+    'marketing-qa': 'sales:read',
+    'marketing-packing-dispatch': 'sales:read',
     packing: 'sales:read',
     dispatches: 'sales:read',
 

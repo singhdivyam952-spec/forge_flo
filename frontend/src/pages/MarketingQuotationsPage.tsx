@@ -25,7 +25,7 @@ export function MarketingQuotationsPage() {
   const convertMutation = useMutation({
     mutationFn: (id: string) => marketingApi.convertQuotationToSalesOrder(id),
     onSuccess: () => {
-      enqueueSnackbar('Sales order created from quotation', { variant: 'success' });
+      enqueueSnackbar('Purchase order created from quotation', { variant: 'success' });
       queryClient.invalidateQueries({ queryKey: ['resource', '/quotations'] });
       queryClient.invalidateQueries({ queryKey: ['resource', '/sales-orders'] });
       queryClient.invalidateQueries({ queryKey: ['marketing-dashboard'] });
@@ -85,7 +85,7 @@ export function MarketingQuotationsPage() {
                 <SendOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Convert to sales order">
+            <Tooltip title="Convert to Purchase Order">
               <IconButton size="small" color="primary" onClick={() => convertMutation.mutate(String(row._id))}>
                 <CompareArrowsOutlinedIcon fontSize="small" />
               </IconButton>

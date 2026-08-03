@@ -35,7 +35,13 @@ export interface ISalesOrderItem {
 
 export interface ISalesOrder extends Document, IAuditable, ISoftDeletable, ITimestamped {
   soNumber: string;
-  customer: Types.ObjectId;
+  customer?: Types.ObjectId;
+  /** Business customer ID from marketing enquiry (for auto-fill). */
+  customerId?: string;
+  customerName?: string;
+  partName?: string;
+  partNumber?: string;
+  customerDrawingNo?: string;
   quotation?: Types.ObjectId;
   items: ISalesOrderItem[];
   orderDate: Date;
@@ -87,7 +93,12 @@ const salesOrderItemSchema = new Schema<ISalesOrderItem>(
 const salesOrderSchema = new Schema<ISalesOrder>(
   {
     soNumber: { type: String, required: true, unique: true, trim: true, uppercase: true },
-    customer: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+    customer: { type: Schema.Types.ObjectId, ref: 'Customer', index: true },
+    customerId: { type: String, trim: true, uppercase: true, index: true },
+    customerName: { type: String, trim: true },
+    partName: { type: String, trim: true },
+    partNumber: { type: String, trim: true },
+    customerDrawingNo: { type: String, trim: true },
     quotation: { type: Schema.Types.ObjectId, ref: 'Quotation' },
     items: { type: [salesOrderItemSchema], default: [] },
     orderDate: { type: Date, required: true, default: Date.now },
@@ -115,7 +126,7 @@ const salesOrderSchema = new Schema<ISalesOrder>(
 
 salesOrderSchema.index({ customer: 1, status: 1 });
 salesOrderSchema.index({ orderDate: -1 });
-salesOrderSchema.index({ soNumber: 'text', poReferenceNumber: 'text' });
+salesOrderSchema.index({ soNumber: 'text', poReferenceNumber: 'text', customerId: 'text', customerName: 'text' });
 salesOrderSchema.index({ 'items.material': 1 });
 
 export const SalesOrder = model<ISalesOrder>('SalesOrder', salesOrderSchema);

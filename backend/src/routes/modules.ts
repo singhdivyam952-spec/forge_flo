@@ -13,6 +13,10 @@ import {
   CostEstimation,
   Quotation,
   SalesOrder,
+  MarketingNpd,
+  MarketingPpc,
+  MarketingQualityAssurance,
+  MarketingPackingDispatch,
   ProductionPlan,
   ProductionOrder,
   MaterialRequisition,
@@ -172,10 +176,42 @@ export function buildModuleRouters(): { path: string; router: Router }[] {
 
   // ---- Sales ----
   modules.push(
-    master('/enquiries', CustomerEnquiry as never, 'Enquiry', 'sales', ['enquiryNumber'], {
+    master('/enquiries', CustomerEnquiry as never, 'Enquiry', 'sales', ['enquiryNumber', 'customerId', 'customerName', 'partName', 'partNumber'], {
       documentNumber: { field: 'enquiryNumber', prefix: 'ENQ' },
-      populate: ['customer'],
-      filterKeys: ['status'],
+      populate: ['customer', 'drawingDocument', 'cadDocument', 'materialSpecDocument'],
+      filterKeys: ['status', 'priority', 'processType', 'workflowStage'],
+      beforeCreate: async (data) => {
+        if (!data.customerId) {
+          data.customerId = await generateDocumentNumber({ prefix: 'CUST' });
+        } else if (typeof data.customerId === 'string') {
+          data.customerId = data.customerId.trim().toUpperCase();
+        }
+        if (typeof data.processType === 'string' && data.processType) {
+          data.selectedProcesses = [data.processType];
+        } else if (typeof data.selectedProcesses === 'string') {
+          data.selectedProcesses = [data.selectedProcesses].filter(Boolean);
+        }
+        if (!data.workflowStage) data.workflowStage = 'EnquiryCreated';
+        data.statusTimeline = [
+          {
+            status: 'EnquiryCreated',
+            changedAt: new Date(),
+          },
+        ];
+        return data;
+      },
+      beforeUpdate: async (_id, data) => {
+        if (typeof data.customerId === 'string') {
+          data.customerId = data.customerId.trim().toUpperCase();
+        }
+        if (typeof data.processType === 'string' && data.processType) {
+          data.selectedProcesses = [data.processType];
+        } else if (typeof data.selectedProcesses === 'string') {
+          data.selectedProcesses = [data.selectedProcesses].filter(Boolean);
+        }
+        if (data.customerId === '') delete data.customerId;
+        return data;
+      },
     })
   );
   modules.push(
@@ -199,11 +235,50 @@ export function buildModuleRouters(): { path: string; router: Router }[] {
     })
   );
   modules.push(
-    master('/sales-orders', SalesOrder as never, 'Sales Order', 'sales', ['soNumber', 'poReferenceNumber'], {
+    master('/sales-orders', SalesOrder as never, 'Sales Order', 'sales', ['soNumber', 'poReferenceNumber', 'customerId', 'customerName'], {
       documentNumber: { field: 'soNumber', prefix: 'SO' },
       populate: ['customer', 'items.material'],
       filterKeys: ['status'],
+      beforeCreate: async (data) => {
+        if (typeof data.customerId === 'string') data.customerId = data.customerId.trim().toUpperCase();
+        return data;
+      },
+      beforeUpdate: async (_id, data) => {
+        if (typeof data.customerId === 'string') data.customerId = data.customerId.trim().toUpperCase();
+        return data;
+      },
     })
+  );
+  modules.push(
+    master('/marketing-npds', MarketingNpd as never, 'Marketing NPD', 'sales', ['npdNumber', 'customerName', 'partName', 'partNumber'], {
+      documentNumber: { field: 'npdNumber', prefix: 'MNPD' },
+      filterKeys: ['status'],
+    })
+  );
+  modules.push(
+    master('/marketing-ppc', MarketingPpc as never, 'Marketing PPC', 'sales', ['ppcNumber', 'customerName', 'partName', 'partNumber'], {
+      documentNumber: { field: 'ppcNumber', prefix: 'MPPC' },
+      filterKeys: ['status', 'planningType'],
+    })
+  );
+  modules.push(
+    master('/marketing-qa', MarketingQualityAssurance as never, 'Marketing QA', 'sales', ['qaNumber', 'customerName', 'partName', 'partNumber'], {
+      documentNumber: { field: 'qaNumber', prefix: 'MQA' },
+      filterKeys: ['status', 'jobType', 'inspectionStage'],
+    })
+  );
+  modules.push(
+    master(
+      '/marketing-packing-dispatch',
+      MarketingPackingDispatch as never,
+      'Marketing Packing Dispatch',
+      'sales',
+      ['packingNumber', 'customerName', 'partName', 'partNumber'],
+      {
+        documentNumber: { field: 'packingNumber', prefix: 'MPD' },
+        filterKeys: ['status', 'jobType'],
+      }
+    )
   );
 
   // ---- Production ----

@@ -334,10 +334,157 @@ export class MarketingService {
     return current;
   }
 
+  async getEnquiryByCustomerId(customerId: string) {
+    const code = customerId.trim().toUpperCase();
+    if (!code) throw AppError.badRequest('Customer ID is required');
+
+    const enquiry = await CustomerEnquiry.findOne({
+      customerId: code,
+      isDeleted: { $ne: true },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!enquiry) throw AppError.notFound(`No enquiry found for customer ID ${code}`);
+
+    return {
+      customerId: enquiry.customerId,
+      customerName: enquiry.customerName,
+      partName: enquiry.partName ?? '',
+      partNumber: enquiry.partNumber ?? '',
+      customerDrawingNo: enquiry.customerDrawingNo ?? '',
+      contactPerson: enquiry.contactPerson ?? '',
+      enquiryNumber: enquiry.enquiryNumber,
+      enquiryDate: enquiry.enquiryDate,
+      rfqDate: enquiry.rfqDate,
+      priority: enquiry.priority,
+      processType: enquiry.processType,
+      selectedProcesses: enquiry.selectedProcesses,
+      quantity: enquiry.quantity,
+      deliverySchedule: enquiry.deliverySchedule,
+      materialSpecification: enquiry.materialSpecification,
+      marketingHead: enquiry.marketingHead,
+      workflowStage: enquiry.workflowStage,
+      existingPartMatched: enquiry.existingPartMatched,
+      remarks: enquiry.remarks,
+      enquiryMongoId: enquiry._id,
+      customer: enquiry.customer,
+    };
+  }
+
+  async setExistingPartDecision(
+    enquiryId: string,
+    payload: { existingPartMatched: boolean; existingPartReference?: string },
+    userId: string
+  ) {
+    const enquiry = await CustomerEnquiry.findById(enquiryId);
+    if (!enquiry) throw AppError.notFound('Enquiry not found');
+
+    enquiry.existingPartChecked = true;
+    enquiry.existingPartMatched = payload.existingPartMatched;
+    enquiry.existingPartReference = payload.existingPartReference;
+    enquiry.workflowStage = payload.existingPartMatched ? 'Feasibility' : 'NPD';
+    enquiry.statusTimeline.push({
+      status: payload.existingPartMatched ? 'ExistingPartMatched' : 'NewPartNPD',
+      changedAt: new Date(),
+      changedBy: new Types.ObjectId(userId),
+      remarks: payload.existingPartReference,
+    } as never);
+    enquiry.updatedBy = new Types.ObjectId(userId) as never;
+    await enquiry.save();
+    return enquiry;
+  }
+
+  async createNpdFromEnquiry(enquiryId: string, userId: string) {
+    const { MarketingNpd } = await import('../models/MarketingNpd');
+    const enquiry = await CustomerEnquiry.findById(enquiryId);
+    if (!enquiry) throw AppError.notFound('Enquiry not found');
+
+    if (enquiry.linkedNpd) {
+      const existing = await MarketingNpd.findById(enquiry.linkedNpd);
+      if (existing) return existing;
+    }
+
+    const npdNumber = await generateDocumentNumber({ prefix: 'MNPD' });
+    const npd = await MarketingNpd.create({
+      npdNumber,
+      customerName: enquiry.customerName,
+      customerId: enquiry.customerId,
+      partName: enquiry.partName || enquiry.customerName,
+      partNumber: enquiry.partNumber || enquiry.enquiryNumber,
+      customerDrawingNo: enquiry.customerDrawingNo,
+      feasibilityStudy: false,
+      status: 'Draft',
+      remarks: `Created from enquiry ${enquiry.enquiryNumber}`,
+      createdBy: userId,
+      updatedBy: userId,
+    });
+
+    enquiry.linkedNpd = npd._id as Types.ObjectId;
+    enquiry.existingPartChecked = true;
+    enquiry.existingPartMatched = false;
+    enquiry.workflowStage = 'NPD';
+    enquiry.status = 'UnderReview';
+    enquiry.statusTimeline.push({
+      status: 'NPDCreated',
+      changedAt: new Date(),
+      changedBy: new Types.ObjectId(userId),
+      remarks: npdNumber,
+    } as never);
+    enquiry.updatedBy = new Types.ObjectId(userId) as never;
+    await enquiry.save();
+
+    return npd;
+  }
+
+  async advanceEnquiryWorkflow(
+    enquiryId: string,
+    stage: string,
+    userId: string,
+    remarks?: string
+  ) {
+    const enquiry = await CustomerEnquiry.findById(enquiryId);
+    if (!enquiry) throw AppError.notFound('Enquiry not found');
+
+    const allowed = [
+      'EnquiryCreated',
+      'DocumentsUploaded',
+      'ExistingPartCheck',
+      'NPD',
+      'Feasibility',
+      'CostEstimation',
+      'Quotation',
+      'PurchaseOrder',
+      'PPC',
+      'PDI',
+      'PackingDispatch',
+      'Completed',
+      'Rejected',
+    ];
+    if (!allowed.includes(stage)) throw AppError.badRequest('Invalid workflow stage');
+
+    enquiry.workflowStage = stage as typeof enquiry.workflowStage;
+    if (stage === 'Rejected') enquiry.status = 'Lost';
+    if (stage === 'Completed') enquiry.status = 'Converted';
+    if (stage === 'Quotation') enquiry.status = 'Quoted';
+    enquiry.statusTimeline.push({
+      status: stage,
+      changedAt: new Date(),
+      changedBy: new Types.ObjectId(userId),
+      remarks,
+    } as never);
+    enquiry.updatedBy = new Types.ObjectId(userId) as never;
+    await enquiry.save();
+    return enquiry;
+  }
+
   async convertEnquiryToRfq(enquiryId: string, userId: string) {
     return mongoose.connection.transaction(async (session) => {
       const enquiry = await CustomerEnquiry.findById(enquiryId).session(session);
       if (!enquiry) throw AppError.notFound('Enquiry not found');
+      if (!enquiry.customer) {
+        throw AppError.badRequest('This enquiry has no linked master customer; RFQ conversion needs a master Customer record.');
+      }
 
       const rfqNumber = await generateDocumentNumber({ prefix: 'RFQ' });
       const rfq = await RFQ.create(
@@ -346,16 +493,25 @@ export class MarketingService {
             rfqNumber,
             enquiry: enquiry._id,
             customer: enquiry.customer,
-            items: enquiry.items.map((item) => ({
-              material: item.material,
-              partDescription: item.partDescription,
-              drawing: item.drawing,
-              qty: item.qty,
-              uom: item.uom,
-              targetPrice: item.targetPrice,
-              remarks: item.remarks,
-            })),
-            rfqDate: new Date(),
+            items:
+              enquiry.items?.length > 0
+                ? enquiry.items.map((item) => ({
+                    material: item.material,
+                    partDescription: item.partDescription,
+                    drawing: item.drawing,
+                    qty: item.qty,
+                    uom: item.uom,
+                    targetPrice: item.targetPrice,
+                    remarks: item.remarks,
+                  }))
+                : [
+                    {
+                      partDescription: enquiry.partName || enquiry.customerName || 'Part',
+                      qty: 1,
+                      uom: 'Nos',
+                    },
+                  ],
+            rfqDate: enquiry.rfqDate || new Date(),
             dueDate: enquiry.dueDate,
             status: 'Draft',
             currentStatus: 'AwaitingEngineering',
@@ -368,6 +524,8 @@ export class MarketingService {
       );
 
       enquiry.status = 'UnderReview';
+      enquiry.linkedRfq = rfq[0]._id as Types.ObjectId;
+      enquiry.workflowStage = 'Feasibility';
       enquiry.statusTimeline.push({ status: 'ConvertedToRFQ', changedAt: new Date(), changedBy: new Types.ObjectId(userId) } as never);
       await enquiry.save({ session });
 

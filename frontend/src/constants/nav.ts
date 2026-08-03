@@ -15,12 +15,8 @@ import DescriptionIcon from '@mui/icons-material/DescriptionOutlined';
 import ScienceIcon from '@mui/icons-material/ScienceOutlined';
 import ChangeCircleIcon from '@mui/icons-material/ChangeCircleOutlined';
 import ContactMailIcon from '@mui/icons-material/ContactMailOutlined';
-import RequestQuoteIcon from '@mui/icons-material/RequestQuoteOutlined';
-import CalculateIcon from '@mui/icons-material/CalculateOutlined';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLongOutlined';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCartOutlined';
 import LocalShippingIcon from '@mui/icons-material/LocalShippingOutlined';
-import Inventory2Icon from '@mui/icons-material/Inventory2';
 import EventNoteIcon from '@mui/icons-material/EventNoteOutlined';
 import PlayCircleIcon from '@mui/icons-material/PlayCircleOutlineOutlined';
 import GroupWorkIcon from '@mui/icons-material/GroupWorkOutlined';
@@ -41,7 +37,6 @@ import NotificationsIcon from '@mui/icons-material/NotificationsOutlined';
 import HistoryIcon from '@mui/icons-material/HistoryOutlined';
 import AssessmentIcon from '@mui/icons-material/AssessmentOutlined';
 import SettingsIcon from '@mui/icons-material/SettingsOutlined';
-import ManageSearchIcon from '@mui/icons-material/ManageSearchOutlined';
 
 export interface NavItem {
   label: string;
@@ -90,20 +85,13 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Dashboard', path: '/sales/dashboard', icon: DashboardIcon, permission: 'sales:read' },
       { label: 'Customers', path: '/sales/customers', icon: PeopleIcon, permission: 'customers:read' },
       { label: 'Customer Contacts', path: '/sales/customer-contacts', icon: ContactMailIcon, permission: 'customers:read' },
-      { label: 'Enquiries', path: '/sales/enquiries', icon: ContactMailIcon, permission: 'sales:read' },
-      { label: 'RFQs', path: '/sales/rfqs', icon: RequestQuoteIcon, permission: 'sales:read' },
-      { label: 'Existing Parts', path: '/sales/existing-parts', icon: ManageSearchIcon, permission: 'sales:read' },
-      { label: 'Cost Estimations', path: '/sales/cost-estimations', icon: CalculateIcon, permission: 'sales:read' },
-      { label: 'Quotations', path: '/sales/quotations', icon: ReceiptLongIcon, permission: 'sales:read' },
-      { label: 'Sales Orders', path: '/sales/sales-orders', icon: ShoppingCartIcon, permission: 'sales:read' },
+      { label: 'Enquiries / RFQ', path: '/sales/enquiries', icon: ContactMailIcon, permission: 'sales:read' },
+      { label: 'NPD', path: '/sales/marketing-npds', icon: ScienceIcon, permission: 'sales:read' },
+      { label: 'Purchase Orders', path: '/sales/sales-orders', icon: ShoppingCartIcon, permission: 'sales:read' },
+      { label: 'PPC', path: '/sales/marketing-ppc', icon: EventNoteIcon, permission: 'sales:read' },
+      { label: 'PDI / Quality Assurance', path: '/sales/marketing-qa', icon: FactCheckIcon, permission: 'sales:read' },
+      { label: 'Packing and Dispatch', path: '/sales/marketing-packing-dispatch', icon: LocalShippingIcon, permission: 'sales:read' },
       { label: 'Reports', path: '/sales/reports', icon: AssessmentIcon, permission: 'sales:read' },
-    ],
-  },
-  {
-    label: 'Dispatch / Logistics',
-    items: [
-      { label: 'Packing', path: '/sales/packing', icon: Inventory2Icon, permission: 'sales:read' },
-      { label: 'Dispatches', path: '/sales/dispatches', icon: LocalShippingIcon, permission: 'sales:read' },
     ],
   },
   {

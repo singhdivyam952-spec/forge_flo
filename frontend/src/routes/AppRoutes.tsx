@@ -113,6 +113,10 @@ const MODULE_ROUTES: { path: string; moduleKey: string; permission: string }[] =
   { path: '/sales/cost-estimations', moduleKey: 'cost-estimations', permission: 'sales:read' },
   { path: '/sales/quotations', moduleKey: 'quotations', permission: 'sales:read' },
   { path: '/sales/sales-orders', moduleKey: 'sales-orders', permission: 'sales:read' },
+  { path: '/sales/marketing-npds', moduleKey: 'marketing-npds', permission: 'sales:read' },
+  { path: '/sales/marketing-ppc', moduleKey: 'marketing-ppc', permission: 'sales:read' },
+  { path: '/sales/marketing-qa', moduleKey: 'marketing-qa', permission: 'sales:read' },
+  { path: '/sales/marketing-packing-dispatch', moduleKey: 'marketing-packing-dispatch', permission: 'sales:read' },
   { path: '/sales/packing', moduleKey: 'packing', permission: 'sales:read' },
   { path: '/sales/dispatches', moduleKey: 'dispatches', permission: 'sales:read' },
 

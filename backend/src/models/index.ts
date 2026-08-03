@@ -45,6 +45,10 @@ export * from './RFQ';
 export * from './CostEstimation';
 export * from './Quotation';
 export * from './SalesOrder';
+export * from './MarketingNpd';
+export * from './MarketingPpc';
+export * from './MarketingQualityAssurance';
+export * from './MarketingPackingDispatch';
 
 // ---- Production planning & execution ----------------------------------------------
 export * from './ProductionPlan';

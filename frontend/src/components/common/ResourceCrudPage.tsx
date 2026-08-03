@@ -15,7 +15,7 @@ import EditIcon from '@mui/icons-material/EditOutlined';
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
-import { createResource, type ListParams } from '../../api/resources';
+import { createResource, fetchEnquiryByCustomerId, type ListParams } from '../../api/resources';
 import { getErrorMessage } from '../../api/client';
 import { DataTable, type DataTableColumn } from './DataTable';
 import { PageHeader } from './PageHeader';
@@ -36,6 +36,9 @@ export interface FieldConfig {
   defaultValue?: unknown;
   helperText?: string;
   gridSize?: number;
+  readOnly?: boolean;
+  /** When true, leaving this field triggers enquiry lookup + auto-fill. */
+  autoFillFromEnquiry?: boolean;
 }
 
 export interface ResourceCrudPageProps<T extends Record<string, unknown>> {
@@ -54,6 +57,8 @@ export interface ResourceCrudPageProps<T extends Record<string, unknown>> {
   disableDelete?: boolean;
   transformSubmit?: (values: Record<string, unknown>) => Record<string, unknown>;
   createLabel?: string;
+  /** Map of enquiry response keys → form field names for auto-fill. */
+  enquiryAutoFillMap?: Record<string, string>;
 }
 
 function buildDefaultValues(fields: FieldConfig[], source?: Record<string, unknown>): Record<string, unknown> {
@@ -65,6 +70,8 @@ function buildDefaultValues(fields: FieldConfig[], source?: Record<string, unkno
         values[field.name] = String(raw).slice(0, 10);
       } else if (raw !== null && typeof raw === 'object' && '_id' in (raw as Record<string, unknown>)) {
         values[field.name] = (raw as Record<string, unknown>)._id;
+      } else if (Array.isArray(raw)) {
+        values[field.name] = raw[0] ?? '';
       } else {
         values[field.name] = raw ?? (field.type === 'boolean' ? false : '');
       }
@@ -74,6 +81,13 @@ function buildDefaultValues(fields: FieldConfig[], source?: Record<string, unkno
   }
   return values;
 }
+
+const DEFAULT_ENQUIRY_AUTO_FILL: Record<string, string> = {
+  customerName: 'customerName',
+  partName: 'partName',
+  partNumber: 'partNumber',
+  customerDrawingNo: 'customerDrawingNo',
+};
 
 export function ResourceCrudPage<T extends Record<string, unknown>>({
   title,
@@ -91,6 +105,7 @@ export function ResourceCrudPage<T extends Record<string, unknown>>({
   disableDelete = false,
   transformSubmit,
   createLabel,
+  enquiryAutoFillMap = DEFAULT_ENQUIRY_AUTO_FILL,
 }: ResourceCrudPageProps<T>) {
   const resource = useMemo(() => createResource<T>(endpoint), [endpoint]);
   const queryClient = useQueryClient();
@@ -102,6 +117,7 @@ export function ResourceCrudPage<T extends Record<string, unknown>>({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<T | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<T | null>(null);
+  const [autoFillLoading, setAutoFillLoading] = useState(false);
 
   const listParams: ListParams = {
     page: page + 1,
@@ -122,6 +138,8 @@ export function ResourceCrudPage<T extends Record<string, unknown>>({
     control,
     handleSubmit,
     reset,
+    setValue,
+    getValues,
     formState: { errors },
   } = useForm<Record<string, unknown>>({ defaultValues: buildDefaultValues(fields) });
 
@@ -168,6 +186,29 @@ export function ResourceCrudPage<T extends Record<string, unknown>>({
     setEditingRow(row);
     reset(buildDefaultValues(fields, row));
     setDialogOpen(true);
+  };
+
+  const fillFromEnquiry = async (customerIdRaw: string) => {
+    const customerId = customerIdRaw.trim();
+    if (!customerId) return;
+    setAutoFillLoading(true);
+    try {
+      const enquiry = await fetchEnquiryByCustomerId(customerId);
+      Object.entries(enquiryAutoFillMap).forEach(([enquiryKey, fieldName]) => {
+        if (!fields.some((f) => f.name === fieldName)) return;
+        const value = enquiry[enquiryKey];
+        if (value === undefined || value === null || value === '') return;
+        setValue(fieldName, value, { shouldDirty: true });
+      });
+      if (enquiry.customerId) {
+        setValue('customerId', enquiry.customerId, { shouldDirty: true });
+      }
+      enqueueSnackbar(`Details loaded from enquiry ${String(enquiry.enquiryNumber ?? '')}`, { variant: 'success' });
+    } catch (error) {
+      enqueueSnackbar(getErrorMessage(error, 'No enquiry found for this Customer ID'), { variant: 'warning' });
+    } finally {
+      setAutoFillLoading(false);
+    }
   };
 
   const onSubmit = handleSubmit((values) => {
@@ -257,7 +298,7 @@ export function ResourceCrudPage<T extends Record<string, unknown>>({
         title={editingRow ? `Edit ${title}` : `New ${title}`}
         onClose={() => setDialogOpen(false)}
         onSave={onSubmit}
-        saving={saving}
+        saving={saving || autoFillLoading}
         maxWidth="sm"
       >
         <Grid container spacing={2} sx={{ pt: 0.5 }}>
@@ -275,6 +316,7 @@ export function ResourceCrudPage<T extends Record<string, unknown>>({
                           <Switch
                             checked={Boolean(controllerField.value)}
                             onChange={(e) => controllerField.onChange(e.target.checked)}
+                            disabled={field.readOnly}
                           />
                         }
                         label={field.label}
@@ -289,6 +331,7 @@ export function ResourceCrudPage<T extends Record<string, unknown>>({
                         select
                         fullWidth
                         label={field.label}
+                        disabled={field.readOnly}
                         error={Boolean(errors[field.name])}
                         helperText={(errors[field.name]?.message as string) || field.helperText}
                       >
@@ -314,7 +357,19 @@ export function ResourceCrudPage<T extends Record<string, unknown>>({
                       minRows={field.type === 'textarea' ? 3 : undefined}
                       InputLabelProps={field.type === 'date' ? { shrink: true } : undefined}
                       error={Boolean(errors[field.name])}
-                      helperText={(errors[field.name]?.message as string) || field.helperText}
+                      helperText={
+                        (errors[field.name]?.message as string) ||
+                        field.helperText ||
+                        (field.autoFillFromEnquiry ? 'Tab / blur to load enquiry details' : undefined)
+                      }
+                      disabled={field.readOnly}
+                      onBlur={(e) => {
+                        controllerField.onBlur();
+                        if (field.autoFillFromEnquiry) {
+                          const next = String(e.target.value ?? getValues(field.name) ?? '');
+                          void fillFromEnquiry(next);
+                        }
+                      }}
                     />
                   );
                 }}

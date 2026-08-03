@@ -24,7 +24,7 @@ const REPORTS = [
   { key: 'customers', title: 'Customer Report', icon: PeopleAltOutlinedIcon },
   { key: 'enquiries', title: 'Enquiry Report', icon: ContactMailOutlinedIcon },
   { key: 'quotations', title: 'Quotation Report', icon: ReceiptLongOutlinedIcon },
-  { key: 'sales-orders', title: 'Sales Order Report', icon: ShoppingCartOutlinedIcon },
+  { key: 'sales-orders', title: 'Purchase Order Report', icon: ShoppingCartOutlinedIcon },
   { key: 'conversion', title: 'Conversion Report', icon: TrendingUpOutlinedIcon },
   { key: 'sales-executive-performance', title: 'Sales Executive Performance', icon: AssessmentOutlinedIcon },
   { key: 'customer-wise-revenue', title: 'Customer Wise Revenue', icon: AssessmentOutlinedIcon },

@@ -37,6 +37,7 @@ export function GenericModulePage({ moduleKey: moduleKeyProp }: GenericModulePag
       disableEdit={config.disableEdit}
       disableDelete={config.disableDelete}
       transformSubmit={config.transformSubmit}
+      enquiryAutoFillMap={config.enquiryAutoFillMap}
     />
   );
 }

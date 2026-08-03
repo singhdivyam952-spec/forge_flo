@@ -16,6 +16,7 @@ export interface ModuleConfig {
   disableEdit?: boolean;
   disableDelete?: boolean;
   transformSubmit?: (values: Record<string, unknown>) => Record<string, unknown>;
+  enquiryAutoFillMap?: Record<string, string>;
 }
 
 function opts(values: readonly string[]): FieldOption[] {
@@ -118,6 +119,13 @@ const HEAT_TREATMENT_TYPES = [
 const HEAT_TREATMENT_STATUSES = ['Planned', 'InProcess', 'Completed', 'Failed'] as const;
 const OUTSOURCING_STATUSES = ['Sent', 'PartiallyReceived', 'Received', 'Closed', 'Cancelled'] as const;
 const PACKING_STATUSES = ['Draft', 'Packed', 'Dispatched', 'Cancelled'] as const;
+const MARKETING_NPD_STATUSES = ['Draft', 'InProgress', 'Completed', 'Cancelled'] as const;
+const MARKETING_PPC_PLANNING_TYPES = ['NPD', 'Regular'] as const;
+const MARKETING_PPC_STATUSES = ['Draft', 'Planned', 'InProgress', 'Completed', 'Cancelled'] as const;
+const MARKETING_QA_JOB_TYPES = ['NPD', 'Regular'] as const;
+const MARKETING_QA_STATUSES = ['Draft', 'InProgress', 'Completed', 'Cancelled'] as const;
+const MARKETING_PACKING_JOB_TYPES = ['NPD', 'Regular'] as const;
+const MARKETING_PACKING_STATUSES = ['Draft', 'Received', 'Packed', 'Dispatched', 'Cancelled'] as const;
 const DISPATCH_STATUSES = ['Draft', 'Dispatched', 'InTransit', 'Delivered', 'Cancelled'] as const;
 const STOCK_TRANSFER_STATUSES = ['Draft', 'InTransit', 'Received', 'Cancelled'] as const;
 const REQUISITION_STATUSES = [
@@ -494,44 +502,62 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
   // ---------------- Sales ----------------
   enquiries: {
     key: 'enquiries',
-    title: 'Customer Enquiry',
+    title: 'Customer Enquiry / RFQ',
     endpoint: '/enquiries',
-    searchPlaceholder: 'Search by enquiry number…',
+    searchPlaceholder: 'Search by enquiry number, customer ID, or name…',
     columns: [
       { id: 'enquiryNumber', label: 'Enquiry No.' },
-      refColumn('customer', 'Customer'),
-      { id: 'customerReferenceNumber', label: 'Customer Ref.' },
+      { id: 'customerId', label: 'Customer ID' },
+      { id: 'customerName', label: 'Customer Name' },
+      { id: 'processType', label: 'Process' },
+      { id: 'partName', label: 'Part Name' },
+      { id: 'workflowStage', label: 'Stage' },
       { id: 'priority', label: 'Priority' },
       dateColumn('enquiryDate', 'Date'),
       statusColumn(),
     ],
     fields: [
-      { name: 'customer', label: 'Customer ID', required: true },
+      { name: 'customerId', label: 'Customer ID', readOnly: true, helperText: 'Auto-generated on save' },
+      { name: 'customerName', label: 'Customer Name', required: true },
       { name: 'contactPerson', label: 'Contact Person' },
       { name: 'source', label: 'Source' },
       { name: 'customerReferenceNumber', label: 'Customer Reference Number' },
-      { name: 'priority', label: 'Priority', type: 'select', options: opts(['Low', 'Medium', 'High', 'Urgent'] as const) },
+      { name: 'priority', label: 'Priority', type: 'select', options: opts(['Low', 'Moderate', 'High', 'Urgent'] as const), defaultValue: 'Moderate' },
       { name: 'expectedAnnualVolume', label: 'Expected Annual Volume', type: 'number' },
-      { name: 'salesExecutive', label: 'Sales Executive (User ID)' },
+      { name: 'marketingHead', label: 'Marketing Head ID' },
       { name: 'enquiryDate', label: 'Enquiry Date', type: 'date' },
+      { name: 'rfqDate', label: 'RFQ Date', type: 'date' },
       { name: 'dueDate', label: 'Due Date', type: 'date' },
+      {
+        name: 'processType',
+        label: 'Process Type',
+        type: 'select',
+        options: opts(['Machining', 'Forging', 'Fabrication', 'Casting', 'Other'] as const),
+        required: true,
+      },
+      { name: 'partName', label: 'Part Name' },
+      { name: 'partNumber', label: 'Part No.' },
+      { name: 'customerDrawingNo', label: 'Customer Drawing No.' },
+      { name: 'quantity', label: 'Quantity', type: 'number' },
+      { name: 'quantityUom', label: 'Qty UOM', defaultValue: 'Nos' },
+      { name: 'deliverySchedule', label: 'Delivery Schedule', type: 'textarea', gridSize: 12 },
+      { name: 'materialSpecification', label: 'Material Specification', type: 'textarea', gridSize: 12 },
       { name: 'leadTimeDays', label: 'Lead Time (days)', type: 'number' },
       { name: 'deliveryLocation', label: 'Delivery Location' },
       { name: 'expectedOrderValue', label: 'Expected Order Value', type: 'number' },
-      { name: 'selectedProcesses', label: 'Selected Processes (comma separated)' },
       { name: 'status', label: 'Status', type: 'select', options: opts(ENQUIRY_STATUSES) },
       { name: 'remarks', label: 'Remarks', type: 'textarea', gridSize: 12 },
     ],
-    transformSubmit: (values) => ({
-      ...values,
-      selectedProcesses:
-        typeof values.selectedProcesses === 'string'
-          ? String(values.selectedProcesses)
-              .split(',')
-              .map((value) => value.trim())
-              .filter(Boolean)
-          : values.selectedProcesses,
-    }),
+    transformSubmit: (values) => {
+      const { customerId, ...rest } = values;
+      const payload: Record<string, unknown> = {
+        ...rest,
+        selectedProcesses:
+          typeof values.processType === 'string' && values.processType ? [values.processType] : [],
+      };
+      if (customerId) payload.customerId = customerId;
+      return payload;
+    },
   },
   rfqs: {
     key: 'rfqs',
@@ -614,28 +640,209 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
   },
   'sales-orders': {
     key: 'sales-orders',
-    title: 'Sales Order',
+    title: 'Purchase Order',
     endpoint: '/sales-orders',
-    searchPlaceholder: 'Search by sales order number or customer PO…',
+    searchPlaceholder: 'Search by order number, customer ID, or customer PO…',
     columns: [
-      { id: 'soNumber', label: 'SO No.' },
-      refColumn('customer', 'Customer'),
+      { id: 'soNumber', label: 'PO No.' },
+      { id: 'customerId', label: 'Customer ID' },
+      { id: 'customerName', label: 'Customer Name' },
+      { id: 'partName', label: 'Part Name' },
       dateColumn('orderDate', 'Order Date'),
       { id: 'poReferenceNumber', label: 'Customer PO No.' },
       { id: 'totalAmount', label: 'Amount', align: 'right' },
       statusColumn(),
     ],
     fields: [
-      { name: 'customer', label: 'Customer ID', required: true },
+      {
+        name: 'customerId',
+        label: 'Customer ID',
+        required: true,
+        autoFillFromEnquiry: true,
+        helperText: 'Enter enquiry Customer ID and blur to auto-fill',
+      },
+      { name: 'customerName', label: 'Customer Name', readOnly: true },
+      { name: 'partName', label: 'Part Name', readOnly: true },
+      { name: 'partNumber', label: 'Part No.', readOnly: true },
+      { name: 'customerDrawingNo', label: 'Customer Drawing No.', readOnly: true },
       { name: 'quotation', label: 'Quotation ID' },
       { name: 'orderDate', label: 'Order Date', type: 'date' },
       { name: 'requiredDate', label: 'Required Date', type: 'date' },
       { name: 'poReferenceNumber', label: 'Customer PO Ref.' },
-      { name: 'paymentTerms', label: 'Payment Terms' },
       { name: 'productionStatus', label: 'Production Status' },
       { name: 'dispatchStatus', label: 'Dispatch Status' },
       { name: 'status', label: 'Status', type: 'select', options: opts(SALES_ORDER_STATUSES) },
       { name: 'totalAmount', label: 'Total Amount', type: 'number' },
+      { name: 'remarks', label: 'Remarks', type: 'textarea', gridSize: 12 },
+    ],
+  },
+  'marketing-npds': {
+    key: 'marketing-npds',
+    title: 'NPD',
+    endpoint: '/marketing-npds',
+    searchPlaceholder: 'Search by NPD number, customer, or part…',
+    columns: [
+      { id: 'npdNumber', label: 'NPD No.' },
+      { id: 'customerId', label: 'Customer ID' },
+      { id: 'customerName', label: 'Customer' },
+      { id: 'partName', label: 'Part Name' },
+      { id: 'partNumber', label: 'Part No.' },
+      boolColumn('feasibilityStudy', 'Feasibility'),
+      statusColumn(),
+    ],
+    fields: [
+      {
+        name: 'customerId',
+        label: 'Customer ID',
+        required: true,
+        autoFillFromEnquiry: true,
+        helperText: 'Enter enquiry Customer ID and blur to auto-fill',
+      },
+      { name: 'customerName', label: 'Customer Name', readOnly: true },
+      { name: 'partName', label: 'Part Name', readOnly: true },
+      { name: 'partNumber', label: 'Part No.', readOnly: true },
+      { name: 'customerDrawingNo', label: 'Customer Drawing No.', readOnly: true },
+      { name: 'feasibilityStudy', label: 'Feasibility Study', type: 'boolean' },
+      { name: 'feasibilityTeamMembers', label: 'Feasibility Team Members', gridSize: 8 },
+      { name: 'feasibilityPdf', label: 'Feasibility PDF (file ref / path)', helperText: 'Paste uploaded file ID or path' },
+      { name: 'reqJigFixtureDesign', label: 'Requirement: Jig Fixture Design', type: 'boolean' },
+      { name: 'reqPfd', label: 'Requirement: PFD', type: 'boolean' },
+      { name: 'reqMaterialConsumables', label: 'Requirement: Material (Consumables)', type: 'boolean' },
+      { name: 'pfdStartDate', label: 'PFD Start Date', type: 'date' },
+      { name: 'pfdEndDate', label: 'PFD End Date', type: 'date' },
+      { name: 'pfdPdf', label: 'PFD PDF (file ref / path)' },
+      { name: 'jigFixtureStartDate', label: 'Jig Fixture Start Date', type: 'date' },
+      { name: 'jigFixtureEndDate', label: 'Jig Fixture End Date', type: 'date' },
+      { name: 'jigFixturePdf', label: 'Jig Fixture PDF (file ref / path)' },
+      { name: 'materialPurchaseStartDate', label: 'Outsourced Material Purchase Start', type: 'date' },
+      { name: 'materialPurchaseEndDate', label: 'Outsourced Material Purchase End', type: 'date' },
+      { name: 'materialPurchasePdf', label: 'Material Purchase PDF (file ref / path)' },
+      { name: 'materialList', label: 'List of Material', type: 'textarea', gridSize: 12 },
+      { name: 'status', label: 'Status', type: 'select', options: opts(MARKETING_NPD_STATUSES) },
+      { name: 'remarks', label: 'Remarks', type: 'textarea', gridSize: 12 },
+    ],
+  },
+  'marketing-ppc': {
+    key: 'marketing-ppc',
+    title: 'PPC',
+    endpoint: '/marketing-ppc',
+    searchPlaceholder: 'Search by PPC number, customer, or part…',
+    columns: [
+      { id: 'ppcNumber', label: 'PPC No.' },
+      { id: 'customerId', label: 'Customer ID' },
+      { id: 'customerName', label: 'Customer' },
+      { id: 'partName', label: 'Part Name' },
+      { id: 'partNumber', label: 'Part No.' },
+      { id: 'planningType', label: 'Planning' },
+      { id: 'plannedQty', label: 'Planned Qty', align: 'right' },
+      { id: 'actualQty', label: 'Actual Qty', align: 'right' },
+      statusColumn(),
+    ],
+    fields: [
+      {
+        name: 'customerId',
+        label: 'Customer ID',
+        required: true,
+        autoFillFromEnquiry: true,
+        helperText: 'Enter enquiry Customer ID and blur to auto-fill',
+      },
+      { name: 'customerName', label: 'Customer Name', readOnly: true },
+      { name: 'partName', label: 'Part Name', readOnly: true },
+      { name: 'partNumber', label: 'Part No.', readOnly: true },
+      { name: 'customerDrawingNo', label: 'Customer Drawing No.', readOnly: true },
+      { name: 'planningType', label: 'PPC Planning', type: 'select', options: opts(MARKETING_PPC_PLANNING_TYPES), required: true },
+      { name: 'npdStartDate', label: 'NPD Start Date', type: 'date' },
+      { name: 'npdEndDate', label: 'NPD End Date', type: 'date' },
+      { name: 'plannedQty', label: 'Planned Qty', type: 'number', defaultValue: 0 },
+      { name: 'actualQty', label: 'Actual Qty', type: 'number', defaultValue: 0 },
+      { name: 'rejectionQty', label: 'Rejection Qty', type: 'number', defaultValue: 0 },
+      { name: 'reworkQty', label: 'Rework Qty', type: 'number', defaultValue: 0 },
+      { name: 'holdQty', label: 'Hold Qty', type: 'number', defaultValue: 0 },
+      { name: 'status', label: 'Status', type: 'select', options: opts(MARKETING_PPC_STATUSES) },
+      { name: 'remarks', label: 'Remarks', type: 'textarea', gridSize: 12 },
+    ],
+  },
+  'marketing-qa': {
+    key: 'marketing-qa',
+    title: 'PDI / Quality Assurance',
+    endpoint: '/marketing-qa',
+    searchPlaceholder: 'Search by QA number, customer, or part…',
+    columns: [
+      { id: 'qaNumber', label: 'QA No.' },
+      { id: 'customerId', label: 'Customer ID' },
+      { id: 'customerName', label: 'Customer' },
+      { id: 'partName', label: 'Part Name' },
+      { id: 'partNumber', label: 'Part No.' },
+      { id: 'jobType', label: 'Type' },
+      { id: 'inspectionStage', label: 'Stage' },
+      { id: 'qtyOk', label: 'Qty OK', align: 'right' },
+      statusColumn(),
+    ],
+    fields: [
+      {
+        name: 'customerId',
+        label: 'Customer ID',
+        required: true,
+        autoFillFromEnquiry: true,
+        helperText: 'Enter enquiry Customer ID and blur to auto-fill',
+      },
+      { name: 'customerName', label: 'Customer Name', readOnly: true },
+      { name: 'partName', label: 'Part Name', readOnly: true },
+      { name: 'partNumber', label: 'Part No.', readOnly: true },
+      { name: 'customerDrawingNo', label: 'Customer Drawing No.', readOnly: true },
+      { name: 'jobType', label: 'Job Type', type: 'select', options: opts(MARKETING_QA_JOB_TYPES), required: true },
+      {
+        name: 'inspectionStage',
+        label: 'Inspection Stage',
+        type: 'select',
+        options: [
+          { label: 'Dispatch', value: 'Dispatch' },
+          { label: 'Pre Inspection', value: 'PreInspection' },
+        ],
+        required: true,
+      },
+      { name: 'qtyReceived', label: 'Qty Received', type: 'number', defaultValue: 0 },
+      { name: 'qtyOk', label: 'Qty OK', type: 'number', defaultValue: 0 },
+      { name: 'qtyNotOk', label: 'Qty Not OK', type: 'number', defaultValue: 0 },
+      { name: 'rejectionQty', label: 'Rejection Qty', type: 'number', defaultValue: 0 },
+      { name: 'reworkQty', label: 'Rework Qty', type: 'number', defaultValue: 0 },
+      { name: 'holdQty', label: 'Hold Qty', type: 'number', defaultValue: 0 },
+      { name: 'status', label: 'Status', type: 'select', options: opts(MARKETING_QA_STATUSES) },
+      { name: 'remarks', label: 'Remarks', type: 'textarea', gridSize: 12 },
+    ],
+  },
+  'marketing-packing-dispatch': {
+    key: 'marketing-packing-dispatch',
+    title: 'Packing and Dispatch',
+    endpoint: '/marketing-packing-dispatch',
+    searchPlaceholder: 'Search by packing number, customer, or part…',
+    columns: [
+      { id: 'packingNumber', label: 'Packing No.' },
+      { id: 'customerId', label: 'Customer ID' },
+      { id: 'customerName', label: 'Customer' },
+      { id: 'partName', label: 'Part Name' },
+      { id: 'partNumber', label: 'Part No.' },
+      { id: 'jobType', label: 'Type' },
+      { id: 'qtyReceived', label: 'Qty Received', align: 'right' },
+      { id: 'packedQty', label: 'Packed Qty', align: 'right' },
+      statusColumn(),
+    ],
+    fields: [
+      {
+        name: 'customerId',
+        label: 'Customer ID',
+        required: true,
+        autoFillFromEnquiry: true,
+        helperText: 'Enter enquiry Customer ID and blur to auto-fill',
+      },
+      { name: 'customerName', label: 'Customer Name', readOnly: true },
+      { name: 'partName', label: 'Part Name', readOnly: true },
+      { name: 'partNumber', label: 'Part No.', readOnly: true },
+      { name: 'customerDrawingNo', label: 'Customer Drawing No.', readOnly: true },
+      { name: 'jobType', label: 'Packing / Dispatch Type', type: 'select', options: opts(MARKETING_PACKING_JOB_TYPES), required: true },
+      { name: 'qtyReceived', label: 'Qty Received', type: 'number', defaultValue: 0 },
+      { name: 'packedQty', label: 'Packed Qty', type: 'number', defaultValue: 0 },
+      { name: 'status', label: 'Status', type: 'select', options: opts(MARKETING_PACKING_STATUSES) },
       { name: 'remarks', label: 'Remarks', type: 'textarea', gridSize: 12 },
     ],
   },

@@ -98,6 +98,60 @@ router.delete(
   })
 );
 
+router.get(
+  '/enquiries/by-customer-id/:customerId',
+  requirePermissions('sales:read'),
+  asyncHandler(async (req, res) => {
+    return ApiResponse.success(res, await marketingService.getEnquiryByCustomerId(req.params.customerId));
+  })
+);
+
+router.post(
+  '/enquiries/:id/existing-part-decision',
+  requirePermissions('sales:update'),
+  asyncHandler(async (req, res) => {
+    return ApiResponse.success(
+      res,
+      await marketingService.setExistingPartDecision(
+        req.params.id,
+        {
+          existingPartMatched: Boolean(req.body.existingPartMatched),
+          existingPartReference: req.body.existingPartReference
+            ? String(req.body.existingPartReference)
+            : undefined,
+        },
+        req.user!.id
+      ),
+      'Existing part decision saved'
+    );
+  })
+);
+
+router.post(
+  '/enquiries/:id/create-npd',
+  requirePermissions('sales:create'),
+  asyncHandler(async (req, res) => {
+    return ApiResponse.created(res, await marketingService.createNpdFromEnquiry(req.params.id, req.user!.id), 'NPD created from enquiry');
+  })
+);
+
+router.post(
+  '/enquiries/:id/advance-workflow',
+  requirePermissions('sales:update'),
+  asyncHandler(async (req, res) => {
+    return ApiResponse.success(
+      res,
+      await marketingService.advanceEnquiryWorkflow(
+        req.params.id,
+        String(req.body.stage),
+        req.user!.id,
+        req.body.remarks ? String(req.body.remarks) : undefined
+      ),
+      'Workflow stage updated'
+    );
+  })
+);
+
 router.post(
   '/enquiries/:id/convert-to-rfq',
   requirePermissions('sales:create'),
